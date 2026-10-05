@@ -1,5 +1,20 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+import { PrismaClient } from "@prisma/client";
+import { randomUUID } from "node:crypto";
 const widths = [360, 390, 430, 768, 1024, 1440];
+// Set E2E_CHECKOUT_CPF=11111111111 when testing a development server.
+// The default remains suitable for a production build, which must reject the exception.
+const checkoutCpf = process.env.E2E_CHECKOUT_CPF ?? "52998224725";
+async function checkWidths(page: Page, name: string) {
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await expect.poll(() => page.evaluate(() => [...document.images].every(img => img.complete && img.naturalWidth > 0))).toBe(true);
+    await page.screenshot({ path: `test-results/${name}-${width}.png`, fullPage: true });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+}
 test("responsive home and catalog render without horizontal overflow at all requested widths", async ({ page }) => {
   const errors: string[] = []; page.on("pageerror", e => errors.push(e.message));
   for (const width of widths) {
@@ -22,17 +37,22 @@ test("search matches brand/category, filters availability and supports no-result
   await page.getByRole("button", { name: "Ver todos os produtos", exact: true }).click(); await expect(page.locator(".product-card")).toHaveCount(12);
 });
 test("mobile purchase: persist cart, validate checkout, create real order, protect receipt and generate WhatsApp", async ({ page, browser }) => {
+  test.setTimeout(120_000);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/produtos/batom-rosa-cha");
+  await checkWidths(page, "product");
   await page.getByRole("button", { name: "Adicionar ao carrinho", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("adicionado");
   await page.getByRole("link", { name: "Carrinho com 1 produtos" }).click();
   await expect(page.locator(".cart-row")).toHaveCount(1); await page.reload(); await expect(page.locator(".cart-row")).toHaveCount(1);
   await page.getByRole("button", { name: /Aumentar quantidade/ }).click(); await expect(page.locator(".quantity span")).toHaveText("2");
+  await checkWidths(page, "cart");
   await page.getByRole("link", { name: "Continuar para finalizar pedido" }).click();
+  await expect(page.getByLabel("Nome completo", { exact: true })).toBeVisible();
+  await checkWidths(page, "checkout");
   await page.getByLabel("Nome completo", { exact: true }).fill("Cliente Teste Browser");
   await page.getByLabel("WhatsApp com DDD", { exact: true }).fill("89999991234");
-  await page.getByLabel("CPF", { exact: true }).fill("11111111111");
+  await page.getByLabel("CPF", { exact: true }).fill("22222222222");
   await page.getByLabel("CEP", { exact: true }).fill("64500000");
   await page.getByLabel("Rua", { exact: true }).fill("Rua de Teste");
   await page.getByLabel("Número", { exact: true }).fill("10");
@@ -40,15 +60,30 @@ test("mobile purchase: persist cart, validate checkout, create real order, prote
   await page.getByLabel("Cidade", { exact: true }).fill("Oeiras");
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Revisar e confirmar pedido" }).click(); await expect(page.locator(".form-error")).toContainText("CPF");
-  await page.getByLabel("CPF", { exact: true }).fill("52998224725");
+  await page.getByLabel("CPF", { exact: true }).fill(checkoutCpf);
   await page.getByRole("button", { name: "Revisar e confirmar pedido" }).click(); await expect(page.getByRole("dialog")).toBeVisible();
+  await checkWidths(page, "checkout-review");
+  const createdResponse = page.waitForResponse(response => response.url().endsWith("/api/pedidos") && response.request().method() === "POST");
   await page.getByRole("button", { name: "Confirmar e criar pedido" }).click();
+  const response = await createdResponse;
+  expect(response.status()).toBe(201);
+  const { orderId } = await response.json();
+  process.loadEnvFile(".env");
+  const db = new PrismaClient();
+  try {
+    const order = await db.order.findUniqueOrThrow({ where: { id: orderId }, select: { customer: { select: { cpf: true } }, totalCents: true, status: true, paymentStatus: true } });
+    expect(order.customer.cpf).toBe(checkoutCpf.replace(/\D/g, ""));
+    expect(order.totalCents).toBe(4480);
+    expect(order.status).toBe("PENDING");
+    expect(order.paymentStatus).toBe("PENDING");
+  } finally { await db.$disconnect(); }
   await expect(page.getByRole("heading", { name: "Seu pedido foi criado!" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Carrinho com 0 produtos" })).toBeVisible();
+  await checkWidths(page, "confirmation");
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   const url = new URL((await page.getByRole("link", { name: "Enviar pedido pelo WhatsApp" }).getAttribute("href"))!);
   expect(url.pathname).toBe("/5589994549682"); const message = url.searchParams.get("text")!;
-  expect(message).toContain("Cliente Teste Browser"); expect(message).toContain("2x Batom"); expect(message).toContain("44,80"); expect(message).not.toMatch(/CPF|52998224725|pago/i);
+  expect(message).toContain("Cliente Teste Browser"); expect(message).toContain("2x Batom"); expect(message).toContain("44,80"); expect(message).not.toMatch(/CPF|52998224725|11111111111|pago/i);
   const receiptUrl = page.url(); await page.reload(); await expect(page.getByRole("heading", { name: "Seu pedido foi criado!" })).toBeVisible();
   await page.screenshot({ path: "test-results/confirmation-mobile.png", fullPage: true });
   const other = await browser.newContext(); const unauthorized = await other.newPage(); await unauthorized.goto(receiptUrl);
@@ -60,4 +95,34 @@ test("mobile purchase: persist cart, validate checkout, create real order, prote
 test("order endpoint rejects cross-origin requests without writing personal data", async ({ request }) => {
   const response = await request.post("/api/pedidos", { headers: { origin: "https://example.invalid" }, data: {} });
   expect(response.status()).toBe(403);
+});
+test("gallery switches images and unavailable products cannot be purchased", async ({ page }) => {
+  process.loadEnvFile(".env");
+  const db = new PrismaClient();
+  let fixtureId: string | undefined;
+  try {
+    const existing = await db.product.findFirstOrThrow({ select: { categoryId: true, brandId: true } });
+    const fixture = await db.product.create({ data: {
+      ...existing, name: "Produto temporário de galeria", slug: `gallery-test-${randomUUID()}`,
+      description: "Fixture removida ao final do teste", priceCents: 1000, stock: 0,
+      images: { create: [
+        { url: "/images/products/lipstick.svg", alt: "Primeira imagem de teste", position: 0 },
+        { url: "/images/products/mascara.svg", alt: "Segunda imagem de teste", position: 1 },
+      ] },
+    } });
+    fixtureId = fixture.id;
+    await page.goto(`/produtos/${fixture.slug}`);
+    await expect(page.locator(".detail-visual img")).toHaveAttribute("alt", "Primeira imagem de teste");
+    await checkWidths(page, "gallery");
+    await page.getByRole("button", { name: "Ver imagem 2", exact: true }).click();
+    await expect(page.locator(".detail-visual img")).toHaveAttribute("alt", "Segunda imagem de teste");
+    await expect(page.getByRole("button", { name: "Ver imagem 2", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "Indisponível", exact: true })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Comprar agora", exact: true })).toBeDisabled();
+    await page.getByRole("button", { name: "Ver imagem 1", exact: true }).click();
+    await expect(page.locator(".detail-visual img")).toHaveAttribute("alt", "Primeira imagem de teste");
+  } finally {
+    if (fixtureId) await db.product.delete({ where: { id: fixtureId } });
+    await db.$disconnect();
+  }
 });

@@ -35,7 +35,13 @@ npm run db:local
 
 Mantenha o terminal aberto. O PostgreSQL usa `127.0.0.1:54329` e armazena os dados em `.local-postgres/data`, ignorado pelo Git. As credenciais incluídas são exclusivas de desenvolvimento. O script reutiliza o banco existente e não apaga dados. Se o banco já está rodando, não inicie uma segunda instância.
 
-Terminal 2, primeira configuração do banco e servidor:
+Terminal 2, para retomar este checkout já configurado:
+
+```powershell
+npm run dev
+```
+
+Somente em uma instalação nova, prepare o banco antes de iniciar:
 
 ```powershell
 npm run db:generate
@@ -154,6 +160,24 @@ Não há integração fictícia com Mercado Pago. Uma integração futura dever�
 
 ## Validação
 
+### CPF fictício no checkout local
+
+Com `npm.cmd run dev`, o formulário e a API aceitam **111.111.111-11** (também sem pontuação). Essa exceção existe somente quando `NODE_ENV !== "production"`, na validação compartilhada de cliente; a função de validação real de CPF permanece intacta. `npm run build` / `npm run start` usam produção e rejeitam esse CPF mesmo no localhost. Outros CPFs inválidos e os demais campos continuam sendo validados normalmente.
+
+Dados fictícios usados no teste: nome `Cliente Teste Browser`, WhatsApp `89999991234`, CPF `111.111.111-11`, CEP `64500-000`, rua `Rua de Teste`, número `10`, bairro `Centro`, cidade `Oeiras`, UF `PI`; complemento e referência vazios. É necessário marcar a leitura da privacidade.
+
+**Revisar e confirmar pedido** abre o modal de revisão. O pedido só é criado ao clicar em **Confirmar e criar pedido** dentro desse modal; depois aparece a confirmação com o botão de WhatsApp. No teste, a API retornou 201, o CPF fictício foi conferido no registro salvo e o link de WhatsApp não continha CPF. Nenhuma mensagem foi enviada.
+
+Para repetir o cenário automatizado contra o servidor de desenvolvimento:
+
+```powershell
+$env:E2E_CHECKOUT_CPF = "11111111111"
+npm.cmd run test:e2e -- --grep "mobile purchase"
+Remove-Item Env:E2E_CHECKOUT_CPF
+```
+
+O CPF padrão da suíte de navegador continua sendo um dado de teste com dígitos verificadores válidos para permitir testar builds de produção. A exceção é coberta separadamente em desenvolvimento, teste e produção, incluindo rejeição explícita pela API de produção sem acesso ao banco.
+
 Com PostgreSQL e o servidor local abertos:
 
 ```powershell
@@ -169,7 +193,17 @@ Os testes de integração usam PostgreSQL real e limpam apenas os registros cria
 
 Os testes visuais cobrem **360, 390, 430, 768, 1024 e 1440 px**, verificando carregamento das imagens e ausência de transbordamento da página. Capturas são salvas em `test-results/`, ignorado pelo Git.
 
-No Windows, o Playwright usa Chrome instalado quando encontrado. Em outros ambientes, instale o navegador com `npx playwright install chromium` ou defina `PLAYWRIGHT_CHROME_PATH` para um executável existente.
+O Playwright usa por padrão `C:/Program Files/Google/Chrome/Application/chrome.exe`. Em outra instalação, defina `PLAYWRIGHT_CHROME_PATH` para um executável existente; não há detecção automática de outro navegador. Se instalar Chromium com `npx playwright install chromium`, configure também seu caminho.
+
+Se o PowerShell bloquear `npm.ps1`, use `npm.cmd` nos comandos acima. O erro `uv_os_get_passwd ENOMEM` encontrado no sandbox Windows exige executar PostgreSQL e testes via `tsx` com a permissão apropriada fora do sandbox; não exige recriar o banco.
+
+### Fechamento da validação em 05/10/2026
+
+Lint, typecheck, build e os 8 testes de domínio passaram. Os 4 testes de integração incluem indisponibilidade do PostgreSQL em processo isolado: a API retorna 503, sem identificador de pedido ou cookie de confirmação. A conexão do banco da loja não é interrompida.
+
+A suíte Playwright foi ampliada para 5 cenários, todos aprovados no desenvolvimento e novamente no build de produção local. Produto, sacola, checkout, revisão e confirmação são verificados em 360, 390, 430, 768, 1024 e 1440 px, com capturas em `test-results/`. As capturas de produto, sacola, checkout e confirmação foram inspecionadas nas seis larguras. A galeria usa um produto temporário com duas imagens, removido ao final junto com suas imagens; produtos da loja não são alterados por esse cenário. A compra continua gerando um pedido fictício e reservando estoque, como documentado acima.
+
+A auditoria npm retornou **8 ocorrências altas** no conjunto completo e **3 com `--omit=dev`**, na cadeia `prisma → @prisma/config → deepmerge-ts`. Embora `prisma` esteja declarado em desenvolvimento, `@prisma/client` mantém essa ferramenta na árvore instalada, portanto não se deve declarar a auditoria de produção limpa. A outra cadeia é `eslint-config-next → @next/eslint-plugin-next → fast-glob → micromatch → braces`. Nenhum pacote foi alterado: as soluções automáticas sugerem downgrades que exigem avaliação de compatibilidade. Essa revisão permanece pendente antes de publicar.
 
 ## Temporário e próximos passos
 

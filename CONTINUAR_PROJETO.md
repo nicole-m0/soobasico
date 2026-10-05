@@ -1,5 +1,43 @@
 # Checkpoint — Só o Básico
 
+## Ajuste durante o teste manual — CPF fictício em desenvolvimento
+
+- A pedido da usuária, `validateCustomer` em `src/lib/validation.ts` agora aceita somente o CPF fictício `11111111111` quando `NODE_ENV !== "production"`, após normalizar a pontuação. O frontend e a API usam essa mesma função. `isValidCpf` permanece intacta; produção continua rejeitando esse CPF.
+- O botão do formulário já estava corretamente ligado a `type="submit"`, `onSubmit={prepare}` e `validateCustomer`. Não foi necessário alterar o handler. Ao clicar em **Revisar e confirmar pedido**, abre o modal; **Confirmar e criar pedido** salva via API e navega para a confirmação.
+- O servidor anterior usava `npm run start`, portanto era produção local. Foi encerrado e substituído por **`npm.cmd run dev`**, disponível em `http://localhost:3000`, com PostgreSQL existente mantido ativo. A exceção não pode funcionar em `npm run start`, mesmo no localhost.
+- Testes adicionados em `tests/cpf-environment.test.ts` para desenvolvimento/teste/produção e em `tests/integration/production-cpf.test.ts` para rejeição real pelo handler da API em produção antes de acessar o banco.
+- Cenário de compra Playwright atualizado: CPF inválido de controle é `22222222222`; CPF da compra aceita configuração `E2E_CHECKOUT_CPF`. A execução desta etapa usou `11111111111`, passou pelo formulário, modal, API (201), conferência do CPF no PostgreSQL, confirmação e link correto de WhatsApp sem CPF. Nenhum envio de mensagem foi realizado.
+- Dados fictícios restantes do cenário passaram sem outro campo inválido: nome `Cliente Teste Browser`, WhatsApp `89999991234`, CEP `64500000`, rua `Rua de Teste`, número `10`, bairro `Centro`, cidade `Oeiras`, UF `PI`, privacidade aceita. Campos obrigatórios, telefone, CEP, estado e privacidade continuam validados.
+- Resultado: **11 testes de domínio, 5 de integração e 1 cenário completo de navegador aprovados; typecheck e lint aprovados**. A compra acrescentou somente um pedido fictício e reservou duas unidades do batom existente; testes de integração limparam apenas suas fixtures. Não houve reset, seed, mudança de schema, `.env`, dependências ou deploy.
+- README atualizado com o CPF permitido, dados fictícios, comportamento dos dois botões e comando para repetir o teste. O relato de produção local na seção histórica seguinte foi substituído pelo servidor de desenvolvimento acima.
+
+---
+
+## Atualização da retomada em 05/10/2026 — estado atual
+
+**A retomada foi autorizada e o fechamento técnico da primeira entrega foi concluído.** Esta seção prevalece sobre o relato histórico da pausa abaixo. Nenhum deploy foi realizado; o próximo passo é a usuária avaliar e aprovar o fluxo local antes de definir a etapa seguinte.
+
+- Checkpoint, AGENTS, README, código, artefatos e Git foram conferidos antes de alterações. Divergência encontrada e comunicada: havia um commit (`95a10a1`) e a árvore estava limpa, ao contrário do registro anterior de arquivos não rastreados. O código atual foi preservado; não houve reset, seed, migração, reinstalação, alteração de `.env` ou das dependências.
+- A documentação local do Next.js foi consultada. Foi adicionado `data-scroll-behavior="smooth"` em `src/app/layout.tsx`, conforme o guia de atualização da versão 16, para a navegação entre páginas voltar ao topo sem animação da rolagem global.
+- `tests/e2e/store.spec.ts` agora possui **5 cenários**. Produto, sacola, checkout, revisão e confirmação geram capturas nas seis larguras previstas e verificam imagens e ausência de overflow. As capturas de produto, sacola, checkout e confirmação foram inspecionadas visualmente nas seis larguras. A galeria com duas imagens foi exercitada com produto temporário e remoção em `finally`; nenhum produto da loja foi modificado por esse cenário.
+- Novo `tests/integration/database-unavailable.test.ts`: conexão PostgreSQL impossível em processo separado, sem interromper o banco da loja. Verifica retorno 503, mensagem de carrinho preservado e ausência de identificador/cookie de confirmação. Integrações existentes continuam validando duplicidade, snapshots, preços/status no servidor, concorrência e rollback.
+- **Resultados finais:** lint aprovado; typecheck aprovado; 8 testes de domínio aprovados; 4 testes de integração aprovados; build aprovado após o ajuste do layout; **5 testes Playwright aprovados no desenvolvimento e novamente no build de produção local** (última execução: 37,5 s). `test-results/.last-run.json` registra `passed`. O `next-env.d.ts` foi atualizado automaticamente pelo build para `.next/types`, sem edição manual.
+- Banco preservado em `.local-postgres/data`: conferência final de **12 produtos, 7 categorias, 6 marcas, 4 pedidos e zero fixtures de galeria**; batom com estoque 12. As duas execuções de navegador desta retomada acrescentaram dois pedidos fictícios e reservaram quatro unidades do batom; pedidos anteriores permanecem. Não confundir lacunas na sequência dos números de pedido com perda de dados: testes de integração removem somente seus registros temporários.
+- Auditoria revista: **8 ocorrências altas no conjunto completo e 3 com `--omit=dev`**, na cadeia Prisma/config/deepmerge-ts. `npm ls` confirmou que `@prisma/client` mantém `prisma` na árvore instalada. Não declarar auditoria de produção limpa. Nenhum `audit fix`, override ou downgrade foi aplicado; as soluções automáticas sugerem versões incompatíveis com a stack fixada e precisam de avaliação antes de publicar.
+- README atualizado com retomada sem seed, caminho explícito do Chrome, alternativa `npm.cmd`, resultados e ressalva da auditoria. A taxa continua R$ 5,00 e o WhatsApp de teste continua 89 99454-9682. Não foi enviado WhatsApp automaticamente.
+- Ambiente deixado para teste: PostgreSQL local ativo na porta 54329 e **`npm.cmd run start`** servindo o build local em `http://localhost:3000`. O dev foi encerrado antes de iniciar produção local. Para editar, encerre esse servidor antes de executar `npm.cmd run dev`; não inicie uma segunda instância do banco. IDs de processo/sessão não devem ser reutilizados.
+
+### Pendências após a primeira entrega local
+
+1. Avaliação e aprovação da usuária no navegador local.
+2. Revisar compatibilidade das correções de dependências antes de qualquer publicação.
+3. Obter produtos, fotos, estoque, taxa e contatos oficiais; finalizar privacidade e condições operacionais quando for preparar publicação.
+4. Cancelamento/reposição/expiração de reservas, administração, retirada e pagamentos continuam etapas futuras; não implementá-las sem novo escopo.
+
+As decisões e limitações históricas abaixo continuam válidas quando não forem substituídas por esta atualização. **Permanece proibido fazer deploy sem autorização explícita.**
+
+---
+
 **Registrado em 05/10/2026. Desenvolvimento pausado por solicitação explícita da usuária.**
 
 ## Instrução para a próxima sessão
