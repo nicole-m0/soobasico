@@ -1,0 +1,138 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  DELIVERED
+  CANCELED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum FulfillmentMethod {
+  DELIVERY
+  PICKUP
+}
+
+model Category {
+  id       String    @id @default(cuid())
+  name     String
+  slug     String    @unique
+  products Product[]
+}
+
+model Brand {
+  id       String    @id @default(cuid())
+  name     String
+  slug     String    @unique
+  products Product[]
+}
+
+model Product {
+  id                    String         @id @default(cuid())
+  name                  String
+  slug                  String         @unique
+  description           String
+  priceCents            Int
+  promotionalPriceCents Int?
+  stock                 Int            @default(0)
+  active                Boolean        @default(true)
+  featured              Boolean        @default(false)
+  bestSeller            Boolean        @default(false)
+  categoryId            String
+  brandId               String
+  category              Category       @relation(fields: [categoryId], references: [id])
+  brand                 Brand          @relation(fields: [brandId], references: [id])
+  images                ProductImage[]
+  orderItems            OrderItem[]
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  @@index([categoryId, active])
+  @@index([brandId])
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  url       String
+  alt       String
+  position  Int     @default(0)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, position])
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  whatsapp  String
+  cpf       String
+  addresses Address[]
+  orders    Order[]
+  createdAt DateTime @default(now())
+}
+
+model Address {
+  id           String   @id @default(cuid())
+  customerId   String
+  customer     Customer @relation(fields: [customerId], references: [id])
+  postalCode   String
+  street       String
+  number       String
+  complement   String?
+  neighborhood String
+  city         String
+  state        String
+  reference    String?
+  orders       Order[]
+}
+
+model Order {
+  id                 String            @id @default(uuid())
+  sequence           Int               @unique @default(autoincrement())
+  orderNumber        String            @unique
+  idempotencyKey     String            @unique
+  accessTokenHash    String
+  customerId         String
+  customer           Customer          @relation(fields: [customerId], references: [id])
+  addressId          String
+  address            Address           @relation(fields: [addressId], references: [id])
+  fulfillmentMethod  FulfillmentMethod @default(DELIVERY)
+  subtotalCents      Int
+  deliveryFeeCents   Int
+  totalCents         Int
+  status             OrderStatus       @default(PENDING)
+  paymentStatus      PaymentStatus     @default(PENDING)
+  items              OrderItem[]
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+}
+
+model OrderItem {
+  id            String   @id @default(cuid())
+  orderId       String
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId     String?
+  product       Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productName   String
+  unitPriceCents Int
+  quantity      Int
+  subtotalCents Int
+
+  @@index([orderId])
+}
