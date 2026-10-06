@@ -82,9 +82,19 @@ npm run db:studio
 
 Abra o endereço exibido, normalmente http://localhost:5555. Cadastre categorias e marcas antes dos produtos. `ProductImage` aceita URLs locais em `/images/...`; para fotografias remotas, configure os domínios em `next.config.ts` antes de usá-las. `position` controla a ordem da galeria.
 
-O seed contém **12 produtos fictícios** em **7 categorias** e não representa o estoque real da Só o Básico. Rodar novamente preserva os produtos e estoques existentes. Para redefinir preços ou quantidades, edite explicitamente pelo Studio; o seed não sobrescreve suas alterações.
+O seed complementa o banco até **40 produtos fictícios** em **7 categorias** e não representa o estoque real da Só o Básico. Rodar novamente preserva os produtos e estoques existentes. Para redefinir preços ou quantidades, edite explicitamente pelo Studio; o seed não sobrescreve suas alterações.
 
 Um `/admin` não foi criado nesta etapa. As entidades e serviços estão separados para permitir sua implementação posterior.
+
+## Home com catálogo completo
+
+A home consulta os mesmos produtos ativos do banco usados por `/produtos`, sem lista fictícia hardcoded na apresentação. Mostra inicialmente 12 cards; **Ver mais produtos** revela mais 12 na mesma página, até os 40 atuais. As imagens dos próximos grupos só são montadas ao expandir. Desktop tem quatro colunas, tablet três e mobile duas. Um bloco editorial aparece após o primeiro grupo no catálogo geral.
+
+Categorias, Todos os produtos, Ofertas e a busca do header apontam para a própria home, com filtros na URL e âncora `#catalogo`. Marca, preço e disponibilidade abrem no drawer; ordenação e busca ficam visíveis. `/produtos` conserva a paginação existente usando o mesmo componente e os mesmos dados.
+
+Os 40 produtos demonstrativos possuem ilustrações locais. Foram preservadas nove imagens anteriores e criados 31 SVGs em `public/products/demo/`, descritos em `src/lib/demo-illustrations.json`. Para regenerar: `node scripts/create-catalog-illustrations.mjs`; para completar o banco: `npm.cmd run db:seed`. O seed só preenche imagens ausentes de ids/slugs demonstrativos conhecidos e corrige o pote genérico antigo do sérum; não substitui imagens próprias cadastradas no Studio nem altera preço, estoque ou pedidos.
+
+Teste específico: `npm.cmd run test:e2e -- tests/e2e/home-catalog.spec.ts` verifica expansão, sete categorias, ofertas, busca/limpeza, filtros/ordenação, imagens/responsividade, estoque e reflexo de cadastro/edição/desativação. Fixtures administrativas temporárias são removidas ao terminar.
 
 ## Banco de dados
 

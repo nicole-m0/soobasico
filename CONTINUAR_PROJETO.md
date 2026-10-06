@@ -1,5 +1,147 @@
 # Checkpoint — Só o Básico
 
+## Primeiro deploy Vercel solicitado — auditoria concluída, publicação aguardando requisitos — 06/10/2026
+
+A usuária autorizou o primeiro deploy de produção na Vercel, condicionado a banco remoto, segurança, auditoria e testes. Também determinou parar quando houver necessidade de ação manual ou credencial. **Não houve deploy, criação/link de projeto Vercel, push Git, conexão a banco remoto, migration ou seed de produção. Não existe URL pública final nesta etapa.**
+
+### Auditoria executada
+
+- **Lint, typecheck, build de produção, 11 testes de domínio, 5 de integração e 12 testes E2E passaram novamente.** Catálogo, sete categorias, busca/filtros/ordenação, imagens/produtos, relacionados, carrinho persistente, estoque/interface/servidor/concorrência, checkout, pedido, confirmação protegida e WhatsApp conferidos.
+- Esta execução de navegador acrescentou **um pedido fictício local** aos 9 anteriores: total esperado 10, com reserva de 2 batons e 1 perfume; estoque esperado batom 2 e perfume 15. Não houve pedido real nem envio de WhatsApp. Testes de integração/E2E removem somente suas fixtures temporárias; registros preexistentes preservados.
+- **CPF repetido `11111111111` rejeitado em produção**, comprovado pelo teste de ambiente e pelo handler real da API em processo `NODE_ENV=production`. Continua permitido exclusivamente em desenvolvimento/teste.
+- `/api/pedidos` retorna somente `orderId` em sucesso, não nome/CPF/endereço; não imprime corpos nem erros Prisma com parâmetros. Confirmação exige cookie HttpOnly e token correspondente ao hash; consulta explícita exclui CPF/hash do payload para o cliente. URL interna usa somente id; WhatsApp usa snapshots e não contém CPF. URL externa wa.me contém os dados necessários à mensagem conforme fluxo aprovado.
+- `/admin`, `/admin/produtos` e `/admin/pedidos` retornaram **404** localmente. Código e tabela de rotas do build confirmam ausência de painel, login e APIs administrativas. **Não confundir 404 com autenticação implementada.** A administração existente é Prisma Studio local; não será publicado/aberto como painel de produção. É necessário identificar branch/checkout que contenha o painel mencionado ou desenvolver o painel/autenticação antes de cumprir esse requisito.
+- `npm audit --omit=dev` retornou **3 ocorrências altas**, na cadeia `prisma` → `@prisma/config` → `deepmerge-ts`, zero críticas. Primeira consulta bloqueada pelo sandbox; repetição autorizada concluída. Correção automática sugere Prisma 6.12.0 classificada como mudança incompatível pelo npm; nenhum downgrade, override ou `audit fix` foi aplicado. Avaliar correção compatível/exposição antes de publicar; não declarar auditoria limpa.
+- Rate limit atual de pedidos permanece em memória de uma instância, conforme comentário do código; não constitui proteção compartilhada entre funções/instâncias Vercel. Resolver proteção distribuída/na borda antes de abrir pedidos publicamente. Política de privacidade ainda é rascunho conforme histórico.
+
+### Git e secrets
+
+- Repositório existente: `origin` aponta para `nicole-m0/soobasico` no GitHub. Há alterações locais e arquivos novos de catálogo ainda não commitados; nenhum push nesta etapa. Último commit local inspecionado: `de52c21`.
+- `.env` e `.env.local` ignorados, não rastreados; consulta ao histórico dessas paths não retornou commits. Apenas `.env.example` está rastreado, com valores de exemplo/local e placeholder de secret. Varredura de padrões usuais de tokens/chaves não encontrou ocorrências nos arquivos examinados. Comparação do `ORDER_ACCESS_SECRET` real com conteúdo dos arquivos rastreados encontrou **zero correspondências**; valor nunca exibido.
+- **Única alteração de configuração nesta auditoria: `.vercel/` adicionado ao `.gitignore`**, confirmado pelo `git check-ignore`. Ainda não existe `.vercel/project.json`; CLI Vercel instalada, autenticação e workspace ainda não verificados. Nenhuma CLI/connector Railway disponível identificado.
+- A senha demonstrativa do PostgreSQL local aparece no script local e no exemplo, não é credencial de produção. Nunca reutilizar esses valores no Railway. `.env` e dados `.local-postgres/data` não foram alterados.
+
+### Banco e Prisma: ponto de parada
+
+- Verificação sanitizada da configuração real: `DATABASE_URL` usa PostgreSQL em **127.0.0.1:54329**. Nenhum banco remoto de produção identificado na configuração examinada; não afirmar que inexista recurso em contas externas ainda não acessadas. Esse banco local não pode ser usado na Vercel.
+- Preferência solicitada: **PostgreSQL Railway dedicado a este projeto**. A usuária deve localizar um recurso existente deste projeto ou criar um novo, sem alterar bancos de outros projetos. Em PostgreSQL → Settings → Networking, adicionar Public Access/TCP Proxy para acesso externo se ainda não houver. Railway disponibiliza `DATABASE_PUBLIC_URL`; usar a conexão externa como `DATABASE_URL` da Vercel, não a URL privada `*.railway.internal`.
+- Não pedir URL com senha no chat. Guardar a conexão remotamente no painel de variáveis de produção ou localmente em `.env.production.local` (ignorado), separada de `.env` local, para prosseguir com acesso seguro. Confirmar projeto/serviço/ambiente e se o banco está vazio ou já tem dados; inspecionar antes de qualquer migration/seed.
+- `build` já executa `prisma generate && next build`; geração comprovada. Comando correto de produção já existe: `npm run db:deploy` → `prisma migrate deploy`. Não executar `migrate dev`/reset em produção. Há uma migration inicial no repositório. Ainda não foi aplicada em banco remoto; definir execução controlada com conexão de produção validada, sem usar o banco de produção em previews.
+- Seed foi revisado: conta todos os produtos, completa até 40 por slug e usa transação/advisory lock; preserva produto/preço/estoque/pedidos e imagens próprias, completando somente assets demonstrativos conhecidos. Idempotência comprovada anteriormente (segunda execução zero novos produtos/imagens). **Seed de produção ainda não executado; quantidade de produtos de produção desconhecida.**
+
+### Variáveis necessárias em produção
+
+Configurar no projeto Vercel → Settings → Environment Variables → **Production**, antes do deploy efetivo. Nenhum valor local foi copiado automaticamente e nenhuma variável foi configurada remotamente nesta etapa.
+
+| Nome | Finalidade / origem do valor |
+| --- | --- |
+| `DATABASE_URL` | Conexão externa real do PostgreSQL Railway dedicado; valor secreto obtido em `DATABASE_PUBLIC_URL` após Public Access |
+| `ORDER_ACCESS_SECRET` | Novo segredo criptograficamente aleatório, pelo menos 32 caracteres; gerar para produção, manter estável e separado do local; nunca `NEXT_PUBLIC_` |
+| `APP_ORIGIN` | Origem HTTPS exata do domínio de produção efetivamente atribuído à Vercel, sem path; não usar localhost nem inventar domínio |
+| `NEXT_PUBLIC_STORE_WHATSAPP` | Número confirmado pela usuária, dígitos com DDI/DDD, compatível com wa.me; atual mascarado **+55 (89) 994**-9682**, ainda de teste |
+| `NEXT_PUBLIC_DELIVERY_FEE_CENTS` | Taxa de entrega em centavos, atual teste 500; confirmar valor para versão pública |
+| `DEMO_CATALOG` | Usar `false` em produção: produtos demonstrativos virão do seed no banco real, sem mascarar falhas de banco com fallback fictício |
+
+Não existem variáveis de autenticação administrativa porque essa funcionalidade não está implementada. `NODE_ENV` é definido pelo Next/Vercel como production no build/start; não liberar a exceção de CPF via configuração manual.
+
+### Retomada
+
+1. Usuária prepara/identifica PostgreSQL Railway e disponibiliza a configuração segura; esclarecer onde está o admin com autenticação e confirmar telefone/taxa.
+2. Resolver pendências de segurança e revisar configuração remota/conta Vercel antes de publicar. Usuária já autorizou deploy quando os requisitos forem satisfeitos; não pedir autorização repetida para passos necessários já autorizados.
+3. Aplicar migrations de produção e seed idempotente somente após inspeção do banco remoto, contar produtos, configurar variáveis e reutilizar/criar **um único** projeto Vercel `so-o-basico`/`soobasico` após verificar recursos existentes.
+4. Deploy de produção e testes reais da URL pública ainda pendentes, incluindo login/admin e consulta ao banco de produção. Não declarar tarefa concluída apenas por build local aprovado.
+
+Ambiente local restaurado após o build: **http://localhost:3000 em desenvolvimento**, PostgreSQL local e Studio preservados. Documentação consultada: [Railway PostgreSQL](https://docs.railway.com/databases/postgresql), [Vercel environment variables](https://vercel.com/docs/environment-variables), [Prisma deployment](https://www.prisma.io/docs/orm/prisma-client/deployment/serverless/deploy-to-vercel). Não houve alteração de funcionalidades ou ação destrutiva.
+
+---
+
+## Home como catálogo geral e ilustrações locais — 06/10/2026
+
+Esta seção prevalece sobre o histórico abaixo. Correção solicitada pela usuária: a home deve ser loja + catálogo, com todos os produtos ativos acessíveis diretamente, sem depender da seção de quatro favoritos.
+
+- **40 produtos ativos** no banco, **12 cards iniciais**. Botão **Ver mais produtos** revela **24 → 36 → 40**, mantendo os cards anteriores e a URL da home. Ao terminar, o botão desaparece. Mudança de busca/filtro/ordenação reinicia a quantidade em 12.
+- `Home` mantém banner e atalhos de categorias e usa `<Catalog home />` como listagem principal. Abas de favoritos/mais vendidos deixaram de substituir o catálogo. `Catalog` é o mesmo componente e usa `StoreProvider/getProducts`, alimentados pelos produtos ativos do PostgreSQL; nenhuma lista demonstrativa hardcoded na home.
+- Grid na home: quatro colunas no desktop, três no tablet e duas no mobile. Filtros em drawer também no desktop, mantendo espaço para o catálogo. Um único bloco editorial após os primeiros 12 cards dá variação ao catálogo geral. `/produtos` preserva sua paginação anterior e os mesmos filtros/dados.
+- Header (desktop e menu mobile): Todos os produtos, sete categorias e Ofertas apontam para `/#catalogo` ou `/?categoria=...#catalogo`/`?ofertas=true`. Busca do header também usa a home. Componente é reiniciado quando os parâmetros da URL mudam, evitando filtro anterior preso ao navegar entre categorias. Limpar busca volta ao catálogo geral. Ofertas usam a promoção válida existente, com preço original riscado.
+- Produtos ativos e categorias/marcas dos filtros derivam dos dados do banco. Criação, preço, estoque, imagem e desativação pelo cadastro foram validados na home usando fixture temporária. Produtos reais futuros entram pelo mesmo caminho, sem necessidade de mudar a lista da home. Continua inexistente `/admin` neste checkout; administração existente é Prisma Studio, não foi criado outro painel.
+
+### Imagens ilustrativas
+
+- **40 produtos com imagem, zero placeholders** no catálogo demonstrativo atual. Nove ilustrações anteriores foram reutilizadas sem sobrescrever arquivos.
+- **31 SVGs originais locais** em `public/products/demo/`, gerados por `scripts/create-catalog-illustrations.mjs`, a partir de `src/lib/demo-illustrations.json`. Fundo claro, objeto centralizado, rosa/bege/branco, sem textos comerciais. Nenhum download nem imagens externas novas. Fontes/explicação em `public/products/demo/README.md`.
+- Produtos que receberam as novas ilustrações:
+  - Maquiagem: Base líquida Natural; Corretivo Líquido Bege; Pó Compacto Natural; Blush Compacto Rosé; Iluminador Champagne; Gloss Labial Crystal; Delineador Preto; Paleta de Sombras Tons Neutros.
+  - Skincare: Sérum facial iluminador; Sabonete Facial Suave; Água Micelar Essencial; Protetor Labial Neutro; Máscara Facial de Cuidado.
+  - Cabelos: Creme para Pentear Diário; Reparador de Pontas; Máscara Capilar Essencial; Kit de Elásticos Coloridos.
+  - Unhas: Esmalte Vermelho Clássico; Esmalte Lilás Suave; Base para Unhas; Removedor de Esmalte.
+  - Perfumes: Body Splash Flor de Algodão; Perfume Masculino Horizonte; Hidratante Corporal Perfumado.
+  - Acessórios: Espelho de bolsa; Kit de Esponjas para Maquiagem; Touca de Cetim Rosa; Escova de Cabelo Compacta.
+  - Bolsas e nécessaires: Nécessaire Pequena Rosa; Nécessaire Grande Organizadora; Porta-Maquiagem de Bolsa.
+- Seed completa somente imagens ausentes dos produtos demonstrativos com id E slug conhecidos. Única correção de imagem antiga: `demo-serum-facial` com exatamente uma imagem `/images/products/skincare.svg` (pote genérico), substituída por conta-gotas. Imagens próprias/alteradas no cadastro são preservadas. Produtos reais sem imagens continuam recebendo o placeholder, sem associação automática a assets fictícios.
+- Execução: **40 produtos + 0 novos, 31 imagens completadas/corrigidas**. Repetição: **40 + 0, zero imagens alteradas/criadas**. Preços, estoques, pedidos, marcas e categorias não foram modificados pelo seed. Nenhuma migration, mudança de arquitetura, env ou dependências.
+
+### Validação e ambiente
+
+- **Lint, typecheck, 11 testes de domínio, 5 de integração e 12 E2E aprovados. Build aprovado.** Quatro novos cenários em `tests/e2e/home-catalog.spec.ts`: expansão completa/imagens/grid, todos os atalhos/busca, filtros/ordenação/carrinho mobile e reflexo das alterações administrativas.
+- Todos os 40 ativos conferidos contra o banco após expandir; imagens carregadas, nenhum card com placeholder, nenhum produto inativo incluído. Categorias do header e Ofertas exercitadas uma a uma. Capturas da home em 390/768/1440 inspecionadas visualmente, com grid 2/3/4; cenário existente também passou em 360/390/430/768/1024/1440. Artefatos em `test-results/home-full-catalog-*.png` e `home-all-40.png`.
+- Testes de imagens agora rolam até imagens lazy antes de conferir carregamento; mantém o comportamento de carregamento leve no produto, sem forçar eager em todos os cards.
+- Carrinho persistente, esgotados e limites de estoque preservados, inclusive cliques rápidos e concorrência no servidor. Checkout criou um pedido real de teste com dois produtos diferentes; confirmação e mensagem WhatsApp continuaram corretas, sem CPF. Nenhuma mensagem enviada.
+- Esta execução E2E acrescentou **1 pedido fictício** aos 8 existentes; **9 pedidos no total**. Batom ficou com estoque 4; perfume com 16. Demais estoques preservados. Fixtures temporárias removidas; pedidos anteriores mantidos.
+- **Sem deploy e sem pagamento real.** Deixar PostgreSQL 54329, desenvolvimento **http://localhost:3000** e Studio **http://localhost:5555** ativos para teste manual. CPF `11111111111` permanece permitido somente em desenvolvimento. Não iniciar outra instância do banco.
+
+---
+
+## Catálogo preenchido e refinado — 06/10/2026
+
+Esta atualização prevalece sobre os registros históricos abaixo. Etapa autorizada: catálogo demonstrativo e refinamentos, sem pagamento real ou deploy.
+
+- Contagem inicial real: **12 produtos e 6 pedidos**. Seed acrescentou **28 produtos**, totalizando **40 produtos ativos, 7 categorias e 6 marcas fictícias**. Segunda execução: **40 + 0 = 40**. Nenhum produto, pedido, preço ou estoque preexistente foi sobrescrito pelo seed; categorias e marcas existentes também são preservadas.
+- Distribuição: Maquiagem 11; Skincare 6; Cabelos 5; Unhas 5; Perfumes 4; Acessórios 5; Bolsas e nécessaires 4. Preços em centavos, de R$ 3,50 a R$ 89,90. Os 28 novos itens usam o placeholder existente; nenhuma imagem externa foi baixada.
+- Seed em `prisma/seed.ts`: conta TODOS os produtos (inclusive inativos), completa até 40 com slugs ausentes, executa em transação com advisory lock para serializar seeds simultâneos. Não reseta estoque nem atualiza cadastros. Pode ser repetido com `npm.cmd run db:seed`; os casos de execução inicial e repetição foram comprovados no banco real.
+- **Nenhuma migration nova**, schema/arquitetura/dependências/env preservados. Sem deploy e sem integração de pagamento.
+
+### Ofertas atuais
+
+| Produto | Original | Promocional |
+| --- | --- | --- |
+| Batom cremoso Rosa Chá | R$ 24,90 | R$ 19,90 |
+| Esmalte nude rosado | R$ 7,90 | R$ 5,90 |
+| Perfume Flor de Algodão | R$ 69,90 | R$ 59,90 |
+| Blush Compacto Rosé | R$ 22,90 | R$ 18,90 |
+| Paleta de Sombras Tons Neutros | R$ 39,90 | R$ 32,90 |
+| Água Micelar Essencial | R$ 21,90 | R$ 17,90 |
+| Máscara Capilar Essencial | R$ 29,90 | R$ 24,90 |
+| Body Splash Flor de Algodão | R$ 29,90 | R$ 24,90 |
+| Nécessaire Grande Organizadora | R$ 49,90 | R$ 39,90 |
+
+### Estoques para teste
+
+- **Últimas unidades (8 produtos):** Blush Compacto Rosé (3), Gloss Labial Crystal (1), Protetor Labial Neutro (3), Reparador de Pontas (2), Esmalte Lilás Suave (3), Perfume Masculino Horizonte (3), Touca de Cetim Rosa (2), Nécessaire Grande Organizadora (3).
+- **Esgotados (2 produtos):** Sérum facial iluminador e Máscara Facial de Cuidado. Aparecem com selo Esgotado, sem botão de compra habilitado.
+- Os testes de checkout desta etapa acrescentaram **2 pedidos fictícios** (total final **8 pedidos**), cada um com 2 batons e 1 perfume. Batom ficou com estoque 6; perfume com 17. Os 6 pedidos anteriores permanecem. Não repor artificialmente essas reservas com seed.
+
+### Refinamentos e validações
+
+- Paginação simples de 12 itens, quatro páginas; navegação sem repetição e reinício na primeira página ao mudar busca, filtros ou ordenação, inclusive ao voltar a uma combinação anterior.
+- Selos derivados: Oferta com percentual para promoção válida; Últimas unidades para estoque 1–3; Esgotado para zero; Novo para até 30 dias de `createdAt`. Sem campos redundantes. Horário capturado no servidor e serializado para o cliente, evitando divergência de hidratação.
+- Promoção continua no campo `promotionalPriceCents`; `isOnSale`/`productPrice` são compartilhados por catálogo, cards, detalhe, home, carrinho e cálculo do pedido. Preço original riscado e preço promocional destacados. Servidor continua rejeitando cadastros de preço inválido.
+- Relacionados: até quatro ativos da mesma categoria, excluindo o próprio item; título “Você também pode gostar”.
+- Busca por nome, marca e categoria sem distinguir caixa/acentos; filtros categoria, marca, disponibilidade, faixa de preço e ofertas; ordenações menor/maior preço, A–Z e novidades comparadas com dados reais do PostgreSQL. Rótulos acessíveis explícitos nos selects de marca e preço.
+- Carrinho mantém a chave `sob-cart-v1` e localStorage. Recarregar/navegar/home preserva os itens. Restauração limita quantidade ao estoque e remove itens inativos/esgotados. Adições rápidas usam referência sincronizada para impedir excesso antes do próximo render; dez cliques no Gloss com estoque 1 resultaram em somente uma unidade. Cards desabilitam adicionar quando a quantidade disponível já está na sacola; detalhe limita pelo estoque restante.
+- Servidor mantém recálculo de preços, transação serializável, decremento condicional atômico, idempotência e retry. Testes PostgreSQL passaram para concorrência pelo último item, snapshots e rollback integral.
+- Checkout e WhatsApp preservados. Pedido com 2 batons + 1 perfume: subtotal R$ 99,70, taxa R$ 5,00, total R$ 104,70. Conferidos nomes, quantidades, preço unitário/subtotal de cada item, total, endereço e número do pedido; mensagem sem CPF. Nenhuma mensagem enviada.
+- **Divergência de contexto:** este checkout não tem `/admin`, autenticação administrativa nem painel próprio. Administração existente é **Prisma Studio**. Navegador confirmou Product com **Showing 40 of 40**. Edição de nome/preço/estoque/desativação foi testada pelo Prisma em fixture temporária, conferindo o reflexo no catálogo e detalhe públicos; fixture removida ao terminar. Não alegar teste de interface `/admin` que não existe nem refazer painel neste escopo.
+- Responsividade: home/catálogo em 360, 390, 430, 768, 1024 e 1440; sem overflow; drawer mobile funcional. Capturas do catálogo em 390/768/1440 inspecionadas visualmente, cards/nomes/preços/badges legíveis. Catálogo com duas colunas mobile e três tablet/desktop, sem renderizar 40 itens de uma vez. Artefatos locais em `test-results/catalog-*.png` e `studio-products.png`.
+
+### Verificações e ambiente para continuar
+
+- **11 testes de domínio e 5 de integração aprovados; 8 cenários E2E aprovados nas execuções correspondentes** (5 existentes e 3 novos em `tests/e2e/catalog.spec.ts`). As primeiras execuções revelaram expectativas de teste incorretas e um retorno indevido à última página ao limpar filtros; todos corrigidos e cenários afetados reexecutados com sucesso.
+- **Lint, typecheck e build aprovados.** Prisma mantém aviso preexistente de configuração de seed deprecated para Prisma 7; stack permanece Prisma 6.19.3.
+- PostgreSQL local ativo em 54329, **desenvolvimento em http://localhost:3000** e **Prisma Studio em http://localhost:5555**. Não iniciar outra instância do banco. CPF fictício `11111111111` continua aceito apenas no desenvolvimento; build/produção o rejeita.
+- Próximo passo: usuária testar catálogo e produtos manualmente. Pagamento real e deploy continuam fora do escopo.
+
+---
+
 ## Ajuste durante o teste manual — CPF fictício em desenvolvimento
 
 - A pedido da usuária, `validateCustomer` em `src/lib/validation.ts` agora aceita somente o CPF fictício `11111111111` quando `NODE_ENV !== "production"`, após normalizar a pontuação. O frontend e a API usam essa mesma função. `isValidCpf` permanece intacta; produção continua rejeitando esse CPF.

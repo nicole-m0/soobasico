@@ -1,4 +1,5 @@
 import type { StoreProduct } from "./types";
+import illustrations from "./demo-illustrations.json";
 export const categories = [
   { name: "Maquiagem", slug: "maquiagem", icon: "lipstick", color: "#f2d9de", caption: "Seu toque de cor" },
   { name: "Skincare", slug: "skincare", icon: "sparkles", color: "#efe5db", caption: "Um carinho na pele" },
@@ -22,6 +23,38 @@ const entries: { name: string; slug: string; category: string; brand: string; pr
   { name: "Sérum facial iluminador", slug: "serum-facial", category: "skincare", brand: "Pele & Cuidado", price: 4590, stock: 0, image: "skincare", description: "Produto fictício para demonstrar o estado indisponível. Imagem ilustrativa, sem promessa de eficácia." },
   { name: "Pincel para blush", slug: "pincel-blush", category: "maquiagem", brand: "Básica Beauty", price: 1890, image: "brush", description: "Um pincel para completar seu kit. Acessório de demonstração com imagem ilustrativa." },
 ];
+// Dados exclusivamente demonstrativos, com ilustrações SVG locais originais.
+const additions: typeof entries = [
+  { name: "Corretivo Líquido Bege", slug: "corretivo-bege", category: "maquiagem", brand: "Básica Beauty", price: 1990, stock: 8, featured: true, description: "Corretivo de demonstração para completar a rotina de maquiagem." },
+  { name: "Pó Compacto Natural", slug: "po-compacto-natural", category: "maquiagem", brand: "Básica Beauty", price: 2490, stock: 15, description: "Pó compacto fictício com tonalidade ilustrativa." },
+  { name: "Blush Compacto Rosé", slug: "blush-rose", category: "maquiagem", brand: "Básica Beauty", price: 2290, promo: 1890, stock: 3, description: "Um toque de cor ilustrativo. Produto demonstrativo." },
+  { name: "Iluminador Champagne", slug: "iluminador-champagne", category: "maquiagem", brand: "Básica Beauty", price: 2690, stock: 8, description: "Iluminador fictício para testar seu kit de maquiagem." },
+  { name: "Gloss Labial Crystal", slug: "gloss-crystal", category: "maquiagem", brand: "Básica Beauty", price: 1490, stock: 1, featured: true, description: "Gloss de demonstração com acabamento ilustrativo." },
+  { name: "Delineador Preto", slug: "delineador-preto", category: "maquiagem", brand: "Básica Beauty", price: 1290, stock: 15, description: "Delineador fictício para compor a seleção de maquiagem." },
+  { name: "Paleta de Sombras Tons Neutros", slug: "paleta-neutros", category: "maquiagem", brand: "Básica Beauty", price: 3990, promo: 3290, stock: 8, description: "Paleta demonstrativa com cores ilustrativas." },
+  { name: "Sabonete Facial Suave", slug: "sabonete-facial", category: "skincare", brand: "Pele & Cuidado", price: 1790, stock: 15, description: "Sabonete facial fictício para testar a rotina de cuidados." },
+  { name: "Água Micelar Essencial", slug: "agua-micelar", category: "skincare", brand: "Pele & Cuidado", price: 2190, promo: 1790, stock: 8, featured: true, description: "Água micelar demonstrativa; composição a definir no catálogo real." },
+  { name: "Protetor Labial Neutro", slug: "protetor-labial", category: "skincare", brand: "Pele & Cuidado", price: 790, stock: 3, description: "Protetor labial fictício para demonstração do catálogo." },
+  { name: "Máscara Facial de Cuidado", slug: "mascara-facial", category: "skincare", brand: "Pele & Cuidado", price: 990, stock: 0, description: "Máscara facial demonstrativa, propositalmente indisponível." },
+  { name: "Creme para Pentear Diário", slug: "creme-pentear", category: "cabelos", brand: "Fio a Fio", price: 1890, stock: 15, description: "Creme para pentear fictício para testar o catálogo." },
+  { name: "Reparador de Pontas", slug: "reparador-pontas", category: "cabelos", brand: "Fio a Fio", price: 1490, stock: 2, description: "Produto demonstrativo para cuidados com os cabelos." },
+  { name: "Máscara Capilar Essencial", slug: "mascara-capilar", category: "cabelos", brand: "Fio a Fio", price: 2990, promo: 2490, stock: 8, featured: true, description: "Máscara capilar fictícia, sem promessa de eficácia." },
+  { name: "Kit de Elásticos Coloridos", slug: "elasticos-coloridos", category: "cabelos", brand: "Detalhe", price: 350, stock: 15, description: "Elásticos demonstrativos em cores ilustrativas." },
+  { name: "Esmalte Vermelho Clássico", slug: "esmalte-vermelho", category: "unhas", brand: "Cor de Mim", price: 790, stock: 15, description: "Esmalte fictício com cor ilustrativa." },
+  { name: "Esmalte Lilás Suave", slug: "esmalte-lilas", category: "unhas", brand: "Cor de Mim", price: 790, stock: 3, description: "Esmalte demonstrativo em tom lilás ilustrativo." },
+  { name: "Base para Unhas", slug: "base-unhas", category: "unhas", brand: "Cor de Mim", price: 890, stock: 8, description: "Base de demonstração para compor o kit de unhas." },
+  { name: "Removedor de Esmalte", slug: "removedor-esmalte", category: "unhas", brand: "Cor de Mim", price: 690, stock: 15, description: "Removedor fictício; volume e composição a definir." },
+  { name: "Body Splash Flor de Algodão", slug: "body-splash-algodao", category: "perfumes", brand: "Essência", price: 2990, promo: 2490, stock: 8, featured: true, description: "Body splash demonstrativo com fragrância ilustrativa." },
+  { name: "Perfume Masculino Horizonte", slug: "perfume-horizonte", category: "perfumes", brand: "Essência", price: 8990, stock: 3, description: "Perfume fictício; notas e volume a definir no catálogo real." },
+  { name: "Hidratante Corporal Perfumado", slug: "hidratante-corporal", category: "perfumes", brand: "Essência", price: 2490, stock: 15, description: "Hidratante demonstrativo com fragrância ilustrativa." },
+  { name: "Kit de Esponjas para Maquiagem", slug: "kit-esponjas", category: "acessorios", brand: "Detalhe", price: 1290, stock: 8, description: "Kit fictício de acessórios para maquiagem." },
+  { name: "Touca de Cetim Rosa", slug: "touca-cetim", category: "acessorios", brand: "Detalhe", price: 1990, stock: 2, description: "Touca demonstrativa com cor e material ilustrativos." },
+  { name: "Escova de Cabelo Compacta", slug: "escova-compacta", category: "acessorios", brand: "Detalhe", price: 1590, stock: 15, description: "Escova fictícia para levar na bolsa." },
+  { name: "Nécessaire Pequena Rosa", slug: "necessaire-pequena", category: "bolsas", brand: "Básica Beauty", price: 1990, stock: 8, description: "Nécessaire demonstrativa para pequenos acessórios." },
+  { name: "Nécessaire Grande Organizadora", slug: "necessaire-grande", category: "bolsas", brand: "Básica Beauty", price: 4990, promo: 3990, stock: 3, description: "Nécessaire fictícia para organizar seus essenciais." },
+  { name: "Porta-Maquiagem de Bolsa", slug: "porta-maquiagem", category: "bolsas", brand: "Básica Beauty", price: 2490, stock: 15, description: "Organizador demonstrativo para a rotina." },
+];
+entries.push(...additions);
 export const demoProducts: StoreProduct[] = entries.map((p, i) => ({
   id: `demo-${p.slug}`, name: p.name, slug: p.slug, description: p.description,
   priceCents: p.price, promotionalPriceCents: p.promo ?? null, stock: p.stock ?? 20,
@@ -29,5 +62,5 @@ export const demoProducts: StoreProduct[] = entries.map((p, i) => ({
   createdAt: new Date(Date.UTC(2026, 9, 1, 0, i)).toISOString(),
   category: categories.find(c => c.slug === p.category)!,
   brand: { name: p.brand, slug: p.brand.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-") },
-  images: p.image ? [{ url: `/images/products/${p.image}.svg`, alt: `Ilustração de ${p.name}; produto fictício` }] : [],
+  images: p.slug in illustrations ? [{ url: `/products/demo/${p.slug}.svg`, alt: `Ilustração de ${p.name}; produto fictício` }] : p.image ? [{ url: `/images/products/${p.image}.svg`, alt: `Ilustração de ${p.name}; produto fictício` }] : [],
 }));

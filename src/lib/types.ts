@@ -12,4 +12,5 @@ export type CheckoutData = {
   neighborhood: string; city: string; state: string; reference: string;
   privacyAccepted: boolean;
 };
-export const productPrice = (product: Pick<StoreProduct, "priceCents" | "promotionalPriceCents">) => product.promotionalPriceCents ?? product.priceCents;
+export const isOnSale = (product: Pick<StoreProduct, "priceCents" | "promotionalPriceCents">) => product.promotionalPriceCents !== null && Number.isSafeInteger(product.promotionalPriceCents) && product.promotionalPriceCents > 0 && product.promotionalPriceCents < product.priceCents;
+export const productPrice = (product: Pick<StoreProduct, "priceCents" | "promotionalPriceCents">) => isOnSale(product) ? product.promotionalPriceCents! : product.priceCents;

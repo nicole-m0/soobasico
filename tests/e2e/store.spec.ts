@@ -5,12 +5,17 @@ const widths = [360, 390, 430, 768, 1024, 1440];
 // Set E2E_CHECKOUT_CPF=11111111111 when testing a development server.
 // The default remains suitable for a production build, which must reject the exception.
 const checkoutCpf = process.env.E2E_CHECKOUT_CPF ?? "52998224725";
+async function loadImages(page: Page) {
+  for (const img of await page.locator("img").all()) await img.scrollIntoViewIfNeeded();
+  await expect.poll(() => page.evaluate(() => [...document.images].every(img => img.complete && img.naturalWidth > 0))).toBe(true);
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+}
 async function checkWidths(page: Page, name: string) {
   for (const width of widths) {
     await page.setViewportSize({ width, height: 900 });
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await expect.poll(() => page.evaluate(() => [...document.images].every(img => img.complete && img.naturalWidth > 0))).toBe(true);
+    await loadImages(page);
     await page.screenshot({ path: `test-results/${name}-${width}.png`, fullPage: true });
   }
   await page.setViewportSize({ width: 390, height: 844 });
@@ -21,18 +26,18 @@ test("responsive home and catalog render without horizontal overflow at all requ
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/"); await expect(page.getByRole("heading", { name: /Um toque de beleza/ })).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await expect.poll(() => page.evaluate(() => [...document.images].every(img => img.complete && img.naturalWidth > 0))).toBe(true);
+    await loadImages(page);
     await page.screenshot({ path: `test-results/home-${width}.png`, fullPage: true });
     await page.goto("/produtos"); await expect(page.locator(".product-card")).toHaveCount(12);
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    if (width < 768) { await page.getByRole("button", { name: "Filtrar", exact: true }).click(); await expect(page.getByRole("dialog")).toBeVisible(); await page.getByRole("button", { name: /Ver 12 produtos/ }).click(); }
+    if (width < 768) { await page.getByRole("button", { name: "Filtrar", exact: true }).click(); await expect(page.getByRole("dialog")).toBeVisible(); await page.getByRole("button", { name: /Ver 40 produtos/ }).click(); }
   }
   expect(errors).toEqual([]);
 });
 test("search matches brand/category, filters availability and supports no-results state", async ({ page }) => {
-  await page.goto("/produtos?busca=Básica"); await expect(page.locator(".product-card")).toHaveCount(5);
-  await page.getByRole("textbox", { name: "Buscar no catálogo" }).fill("skincare"); await expect(page.locator(".product-card")).toHaveCount(2);
-  await page.getByLabel("Somente em estoque", { exact: true }).check(); await expect(page.locator(".product-card")).toHaveCount(1);
+  await page.goto("/produtos?busca=Básica"); await expect(page.locator(".product-card")).toHaveCount(12);
+  await page.getByRole("textbox", { name: "Buscar no catálogo" }).fill("skincare"); await expect(page.locator(".product-card")).toHaveCount(6);
+  await page.getByLabel("Somente em estoque", { exact: true }).check(); await expect(page.locator(".product-card")).toHaveCount(4);
   await page.getByRole("textbox", { name: "Buscar no catálogo" }).fill("não-existe"); await expect(page.getByText("Nenhum básico por aqui ainda")).toBeVisible();
   await page.getByRole("button", { name: "Ver todos os produtos", exact: true }).click(); await expect(page.locator(".product-card")).toHaveCount(12);
 });
@@ -43,9 +48,11 @@ test("mobile purchase: persist cart, validate checkout, create real order, prote
   await checkWidths(page, "product");
   await page.getByRole("button", { name: "Adicionar ao carrinho", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("adicionado");
-  await page.getByRole("link", { name: "Carrinho com 1 produtos" }).click();
-  await expect(page.locator(".cart-row")).toHaveCount(1); await page.reload(); await expect(page.locator(".cart-row")).toHaveCount(1);
-  await page.getByRole("button", { name: /Aumentar quantidade/ }).click(); await expect(page.locator(".quantity span")).toHaveText("2");
+  await page.goto("/produtos/perfume-flor");
+  await page.getByRole("button", { name: "Adicionar ao carrinho", exact: true }).click();
+  await page.getByRole("link", { name: "Carrinho com 2 produtos" }).click();
+  await expect(page.locator(".cart-row")).toHaveCount(2); await page.reload(); await expect(page.locator(".cart-row")).toHaveCount(2);
+  await page.locator(".cart-row").first().getByRole("button", { name: /Aumentar quantidade/ }).click(); await expect(page.locator(".cart-row").first().locator(".quantity span")).toHaveText("2");
   await checkWidths(page, "cart");
   await page.getByRole("link", { name: "Continuar para finalizar pedido" }).click();
   await expect(page.getByLabel("Nome completo", { exact: true })).toBeVisible();
@@ -73,7 +80,7 @@ test("mobile purchase: persist cart, validate checkout, create real order, prote
   try {
     const order = await db.order.findUniqueOrThrow({ where: { id: orderId }, select: { customer: { select: { cpf: true } }, totalCents: true, status: true, paymentStatus: true } });
     expect(order.customer.cpf).toBe(checkoutCpf.replace(/\D/g, ""));
-    expect(order.totalCents).toBe(4480);
+    expect(order.totalCents).toBe(10470);
     expect(order.status).toBe("PENDING");
     expect(order.paymentStatus).toBe("PENDING");
   } finally { await db.$disconnect(); }
@@ -83,7 +90,7 @@ test("mobile purchase: persist cart, validate checkout, create real order, prote
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   const url = new URL((await page.getByRole("link", { name: "Enviar pedido pelo WhatsApp" }).getAttribute("href"))!);
   expect(url.pathname).toBe("/5589994549682"); const message = url.searchParams.get("text")!;
-  expect(message).toContain("Cliente Teste Browser"); expect(message).toContain("2x Batom"); expect(message).toContain("44,80"); expect(message).not.toMatch(/CPF|52998224725|11111111111|pago/i);
+  expect(message).toContain("Cliente Teste Browser"); expect(message).toContain("2x Batom"); expect(message).toContain("1x Perfume Flor de Algodão"); expect(message).toContain("Subtotal:"); expect(message).toContain("Taxa de entrega:"); expect(message).toContain("Rua de Teste, 10"); expect(message).toMatch(/SOB-\d+/); expect(message).toContain("104,70"); expect(message).not.toMatch(/CPF|52998224725|11111111111|pago/i);
   const receiptUrl = page.url(); await page.reload(); await expect(page.getByRole("heading", { name: "Seu pedido foi criado!" })).toBeVisible();
   await page.screenshot({ path: "test-results/confirmation-mobile.png", fullPage: true });
   const other = await browser.newContext(); const unauthorized = await other.newPage(); await unauthorized.goto(receiptUrl);
